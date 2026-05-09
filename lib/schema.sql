@@ -1,0 +1,156 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sku TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  price_cents INTEGER NOT NULL,
+  description TEXT NOT NULL,
+  material TEXT NOT NULL DEFAULT '',
+  size_chart TEXT NOT NULL DEFAULT '',
+  care_instructions TEXT NOT NULL DEFAULT '',
+  model_info TEXT NOT NULL DEFAULT '',
+  image TEXT NOT NULL,
+  gallery TEXT NOT NULL,
+  stock INTEGER NOT NULL DEFAULT 0,
+  archived INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS product_variants (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL,
+  sku TEXT NOT NULL UNIQUE,
+  size TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT 'BLACK',
+  price_cents INTEGER NOT NULL,
+  stock INTEGER NOT NULL DEFAULT 0,
+  reserved INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(product_id, size, color),
+  FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS cart_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  product_id INTEGER NOT NULL,
+  variant_id INTEGER,
+  size TEXT NOT NULL DEFAULT '2',
+  quantity INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(session_id, product_id, size),
+  FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY(variant_id) REFERENCES product_variants(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL DEFAULT 'customer',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+  token TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS addresses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  label TEXT NOT NULL DEFAULT 'DEFAULT',
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  apartment TEXT,
+  city TEXT NOT NULL,
+  country TEXT NOT NULL,
+  province TEXT NOT NULL,
+  postal_code TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_number TEXT NOT NULL UNIQUE,
+  user_id INTEGER,
+  email TEXT NOT NULL,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  apartment TEXT,
+  city TEXT NOT NULL,
+  country TEXT NOT NULL,
+  province TEXT NOT NULL,
+  postal_code TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  subtotal_cents INTEGER NOT NULL,
+  shipping_cents INTEGER NOT NULL DEFAULT 0,
+  tax_cents INTEGER NOT NULL DEFAULT 0,
+  total_cents INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending_payment',
+  payment_provider TEXT NOT NULL DEFAULT 'manual',
+  payment_status TEXT NOT NULL DEFAULT 'unpaid',
+  payment_reference TEXT NOT NULL DEFAULT '',
+  inventory_locked_until TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id INTEGER NOT NULL,
+  product_id INTEGER NOT NULL,
+  variant_id INTEGER,
+  sku TEXT NOT NULL,
+  size TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  price_cents INTEGER NOT NULL,
+  FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  FOREIGN KEY(product_id) REFERENCES products(id),
+  FOREIGN KEY(variant_id) REFERENCES product_variants(id)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_movements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  variant_id INTEGER NOT NULL,
+  order_id INTEGER,
+  type TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(variant_id) REFERENCES product_variants(id) ON DELETE CASCADE,
+  FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id INTEGER NOT NULL,
+  provider TEXT NOT NULL,
+  status TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  reference TEXT NOT NULL,
+  redirect_url TEXT NOT NULL DEFAULT '',
+  raw_payload TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS site_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
