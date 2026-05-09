@@ -54,16 +54,35 @@
     @apply text-black font-bold;
   }
 
+  .cart-bag-active {
+    animation: cart-bag-bounce 0.62s cubic-bezier(0.22, 1, 0.36, 1);
+    transform-origin: center;
+  }
+
+  .cart-flight {
+    @apply pointer-events-none fixed left-0 top-0 z-50 flex h-12 w-12 items-center justify-center rounded-full  text-ink shadow-[0_10px_24px_rgba(0,0,0,0.08)];
+    animation: cart-flight-move 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    transform: translate(
+      calc(var(--flight-start-x) - 50%),
+      calc(var(--flight-start-y) - 50%)
+    );
+  }
+
   .product-grid {
-    @apply grid grid-cols-6 gap-x-11 gap-y-[62px] pt-28;
+    @apply grid grid-cols-6 gap-x-11 gap-y-[62px] pt-28 transition-[grid-template-columns,gap] duration-300 ease-out;
+  }
+
+  .product-grid.expanded {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 72px 96px;
   }
 
   .product-card {
-    @apply min-w-0 text-center;
+    @apply min-w-0 text-center transition-transform duration-300 ease-out;
   }
 
   .product-media {
-    @apply relative w-full;
+    @apply relative w-full transition-[transform] duration-300 ease-out;
     aspect-ratio: 1 / 0.95;
   }
 
@@ -77,6 +96,10 @@
 
   .product-name {
     @apply mt-6;
+  }
+
+  .grid-toggle {
+    @apply fixed left-7 top-[118px] z-20 inline-flex h-7 w-7 items-center justify-center;
   }
 
   .detail-stage {
@@ -127,7 +150,7 @@
   }
 
   .add-button {
-    @apply text-[34px] leading-none;
+    @apply relative text-[34px] font-[600] leading-none transition-transform duration-150 hover:scale-105 active:scale-95;
   }
 
   .variant-picker {
@@ -180,7 +203,9 @@
   }
 
   .pay-button {
-    @apply h-[50px] bg-[#8d8d8d] text-2xl font-bold text-white transition-transform duration-150;
+    @apply flex h-[50px] w-full items-center justify-center overflow-hidden bg-[#8d8d8d] px-4 text-center text-2xl font-bold text-white transition-transform duration-150;
+    line-height: 1.05;
+    text-wrap: balance;
   }
 
   .pay-button.paypal {
@@ -192,7 +217,7 @@
   }
 
   .pay-button:disabled {
-    @apply cursor-not-allowed bg-[#c8c8c8] text-[#f4f4f4];
+    @apply cursor-not-allowed bg-[#c8c8c8] text-[#f4f4f4] opacity-100;
   }
 
   .section-title {
@@ -245,15 +270,71 @@
   }
 
   .cart-meta {
-    @apply leading-normal;
+    @apply grid content-start gap-1 leading-normal;
+  }
+
+  @keyframes cart-flight-move {
+    0% {
+      opacity: 0;
+      transform: translate(
+          calc(var(--flight-start-x) - 50%),
+          calc(var(--flight-start-y) - 50%)
+        )
+        scale(0.76);
+    }
+    12% {
+      opacity: 1;
+    }
+    78% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(
+          calc(var(--flight-start-x) - 50% + var(--flight-delta-x)),
+          calc(var(--flight-start-y) - 50% + var(--flight-delta-y))
+        )
+        scale(0.58);
+    }
+  }
+
+  @keyframes cart-bag-bounce {
+    0% {
+      transform: scale(1) rotate(0deg);
+    }
+    24% {
+      transform: scale(1.24) rotate(-11deg);
+    }
+    46% {
+      transform: scale(1.08) rotate(10deg);
+    }
+    68% {
+      transform: scale(1.16) rotate(-6deg);
+    }
+    100% {
+      transform: scale(1) rotate(0deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cart-bag-active,
+    .cart-flight,
+    .add-button {
+      animation: none !important;
+      transition: none !important;
+    }
   }
 
   .qty-row {
-    @apply mt-3 flex items-center justify-end gap-5;
+    @apply flex items-center justify-end gap-5;
   }
 
   .cart-price {
-    @apply text-right;
+    @apply grid content-start justify-items-end gap-1 text-right;
+  }
+
+  .cart-variant-value {
+    @apply min-h-6;
   }
 
   .totals {
@@ -311,6 +392,10 @@
 
   .toast-info span {
     @apply bg-[#f3f3f3] text-ink;
+  }
+
+  .sr-only-form {
+    @apply hidden;
   }
 
   .admin-shell {
@@ -572,7 +657,10 @@
 
   .variant-add-row {
     @apply grid items-center gap-2.5 border-t border-[#ddd] pt-3;
-    grid-template-columns: minmax(120px, 1fr) minmax(128px, 160px) minmax(128px, 160px) minmax(110px, 140px);
+    grid-template-columns: minmax(120px, 1fr) minmax(128px, 160px) minmax(
+        128px,
+        160px
+      ) minmax(110px, 140px);
   }
 
   .variant-add-row > input {
@@ -581,7 +669,7 @@
 
   .admin-actions {
     @apply mt-1.5 grid items-stretch gap-2.5;
-    grid-template-columns: 1fr minmax(72px, 160px);
+    grid-template-columns: 1fr;
   }
 
   .admin-action-button {
@@ -600,8 +688,136 @@
     @apply mx-auto mb-14;
   }
 
+  .admin-payment-grid {
+    @apply grid gap-5;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-payment-card {
+    @apply grid gap-4 border border-ink bg-paper p-4;
+  }
+
+  .admin-payment-head {
+    @apply flex items-center justify-between gap-4;
+  }
+
+  .admin-toggle {
+    @apply inline-flex items-center gap-2 text-sm text-mute;
+  }
+
+  .admin-toggle input {
+    @apply h-4 w-4;
+  }
+
+  .setting-field {
+    @apply grid gap-2;
+  }
+
+  .setting-field > span,
+  .setting-readonly > span {
+    @apply text-sm text-ink;
+  }
+
+  .setting-field input,
+  .setting-field input::placeholder,
+  .setting-readonly code {
+    text-transform: none;
+  }
+
+  .setting-field small,
+  .setting-readonly small {
+    @apply text-xs leading-snug text-mute;
+  }
+
+  .setting-readonly {
+    @apply grid gap-2 border border-[#ddd] bg-[#fafafa] p-3;
+  }
+
+  .setting-readonly code {
+    @apply w-fit bg-paper px-2 py-1 text-sm normal-case;
+    word-break: break-all;
+  }
+
   .admin-table-toolbar {
     @apply flex items-end justify-between gap-5;
+  }
+
+  .admin-filter-row .text-button.active {
+    @apply bg-ink text-paper;
+  }
+
+  .order-confirmation {
+    @apply mx-auto grid gap-8;
+    width: min(1180px, calc(100vw - 56px));
+  }
+
+  .order-confirmation-head h1 {
+    @apply m-0 text-3xl;
+  }
+
+  .order-confirmation-head p {
+    @apply mb-0 mt-2 text-mute;
+  }
+
+  .order-confirmation-grid {
+    @apply grid gap-5;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  }
+
+  .order-confirmation-panel {
+    @apply grid gap-5 border border-ink bg-paper p-5;
+  }
+
+  .order-confirmation-meta {
+    @apply grid gap-4;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .order-confirmation-meta span,
+  .order-confirmation-address span {
+    @apply block text-sm text-mute;
+  }
+
+  .order-confirmation-meta strong,
+  .order-confirmation-address strong {
+    @apply mt-2 block;
+  }
+
+  .order-confirmation-address p {
+    @apply my-1;
+  }
+
+  .order-confirmation-items {
+    @apply grid gap-4;
+  }
+
+  .order-confirmation-item {
+    @apply grid items-center gap-4 border-b border-[#ddd] pb-4 last:border-b-0 last:pb-0;
+    grid-template-columns: 84px minmax(0, 1fr) auto;
+  }
+
+  .order-confirmation-item img {
+    @apply h-[84px] w-[84px] object-contain;
+  }
+
+  .order-confirmation-item div {
+    @apply grid gap-1;
+  }
+
+  .order-confirmation-item span {
+    @apply text-sm text-mute;
+  }
+
+  .order-confirmation-totals {
+    @apply grid gap-3 border-t border-ink pt-4;
+  }
+
+  .order-confirmation-totals > div {
+    @apply grid grid-cols-[1fr_auto] gap-4;
+  }
+
+  .order-confirmation-actions {
+    @apply flex flex-wrap gap-3;
   }
 
   .admin-table-toolbar span {
@@ -651,6 +867,31 @@
   .pagination a.disabled {
     @apply pointer-events-none border-[#d7d7d7] text-[#aaa];
   }
+
+  .admin-modal-backdrop {
+    @apply fixed inset-0 z-50 grid place-items-center bg-black/25 p-5;
+  }
+
+  .admin-modal {
+    @apply grid w-full max-w-[560px] gap-5 border border-ink bg-paper p-5 shadow-[8px_8px_0_#111];
+  }
+
+  .admin-modal h3 {
+    @apply m-0 text-2xl;
+  }
+
+  .admin-modal p {
+    @apply m-0 leading-snug text-mute;
+  }
+
+  .admin-modal textarea {
+    @apply min-h-[96px] w-full resize-y border border-ink bg-paper p-3;
+  }
+
+  .admin-modal-actions {
+    @apply grid gap-2.5;
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @layer utilities {
@@ -682,6 +923,11 @@
     @apply grid-cols-3;
   }
 
+  .product-grid.expanded {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 48px;
+  }
+
   .checkout {
     @apply grid-cols-1;
   }
@@ -708,8 +954,17 @@
     @apply grid-cols-2 gap-x-6 gap-y-11 pt-[104px];
   }
 
+  .product-grid.expanded {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 44px 24px;
+  }
+
   .product-name {
     @apply mt-3.5;
+  }
+
+  .grid-toggle {
+    @apply left-[18px] top-[104px];
   }
 
   .detail-image-wrap {
@@ -727,6 +982,15 @@
   .checkout {
     @apply gap-[42px] pt-[92px];
     width: calc(100vw - 36px);
+  }
+
+  .admin-payment-grid {
+    @apply grid-cols-1;
+  }
+
+  .order-confirmation-grid,
+  .order-confirmation-meta {
+    @apply grid-cols-1;
   }
 
   .express-pay,

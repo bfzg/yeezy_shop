@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       phone: body.phone,
       paymentProvider: body.paymentProvider ?? "manual"
     }, sessionId);
-    const payment = createPayment(order.orderId, body.paymentProvider ?? "manual", order.totals.totalCents);
+    const payment = await createPayment(order.orderId, body.paymentProvider ?? "manual", order.totals.totalCents);
     return NextResponse.json({ ...order, payment });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Checkout failed." }, { status: 400 });

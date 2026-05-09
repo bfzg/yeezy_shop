@@ -187,13 +187,48 @@ export function releaseOrderLock(orderId: number) {
   }
 }
 
-export function fulfillOrder(orderId: number) {
+export function fulfillOrder(orderId: number, shipping: { carrier: string; trackingNumber: string; note?: string }) {
   const current = db().prepare("SELECT status FROM orders WHERE id = ?").get(orderId) as { status: string } | undefined;
   if (!current) throw new Error("Order not found.");
   if (current.status !== "paid") {
     throw new Error("Only paid orders can be fulfilled.");
   }
-  db().prepare("UPDATE orders SET status = 'fulfilled' WHERE id = ?").run(orderId);
+  db().prepare(`
+    UPDATE orders
+    SET
+      status = 'fulfilled',
+      shipping_carrier = ?,
+      tracking_number = ?,
+      shipping_note = ?,
+      fulfilled_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(
+    shipping.carrier.trim(),
+    shipping.trackingNumber.trim(),
+    (shipping.note ?? "").trim(),
+    orderId
+  );
+}
+
+export function updateShippingInfo(orderId: number, shipping: { carrier: string; trackingNumber: string; note?: string }) {
+  const current = db().prepare("SELECT status FROM orders WHERE id = ?").get(orderId) as { status: string } | undefined;
+  if (!current) throw new Error("Order not found.");
+  if (!["paid", "fulfilled"].includes(current.status)) {
+    throw new Error("Only paid or fulfilled orders can update shipping info.");
+  }
+  db().prepare(`
+    UPDATE orders
+    SET
+      shipping_carrier = ?,
+      tracking_number = ?,
+      shipping_note = ?
+    WHERE id = ?
+  `).run(
+    shipping.carrier.trim(),
+    shipping.trackingNumber.trim(),
+    (shipping.note ?? "").trim(),
+    orderId
+  );
 }
 
 export function refundOrder(orderId: number) {

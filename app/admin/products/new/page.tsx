@@ -13,7 +13,7 @@ export default async function NewProductPage() {
   const cart = getCart(sessionId);
 
   return (
-    <main className="shell admin-shell">
+    <main className="shell admin-shell max-w-[1180px] mx-auto">
       <StoreChrome cartCount={cart.reduce((sum, line) => sum + line.quantity, 0)} backHref="/admin" />
       <section className="admin-header">
         <div>

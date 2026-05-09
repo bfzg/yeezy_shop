@@ -162,12 +162,6 @@ export function AdminProductManager({ products }: { products: Product[] }) {
             <button
               className={`product-admin-card ${editing?.id === product.id ? "selected" : ""} ${dragProductId === product.id ? "dragging" : ""}`}
               key={product.id}
-              draggable
-              onDragStart={() => setDragProductId(product.id)}
-              onDragEnd={() => {
-                setDragProductId(null);
-                saveProductOrder();
-              }}
               onDragOver={(event) => {
                 event.preventDefault();
                 if (dragProductId !== null) moveProduct(dragProductId, product.id);
@@ -178,7 +172,20 @@ export function AdminProductManager({ products }: { products: Product[] }) {
               aria-pressed={editing?.id === product.id}
               style={{ viewTransitionName: `admin-product-${product.id}` }}
             >
-              <span className="drag-handle" aria-hidden="true">
+              <span
+                className="drag-handle"
+                aria-hidden="true"
+                draggable
+                onDragStart={(event) => {
+                  event.stopPropagation();
+                  setDragProductId(product.id);
+                }}
+                onDragEnd={(event) => {
+                  event.stopPropagation();
+                  setDragProductId(null);
+                  saveProductOrder();
+                }}
+              >
                 <i />
                 <i />
                 <i />
@@ -261,7 +268,7 @@ export function AdminProductManager({ products }: { products: Product[] }) {
                 <input name="newVariantStock" placeholder="库存" form="variant-add-form" />
                 <span>件</span>
               </label>
-              <button className="admin-action-button" form="variant-add-form" type="submit">新增变体</button>
+              <button className="admin-action-button h-[45px]" form="variant-add-form" type="submit">新增变体</button>
             </div>
             <div className="admin-actions">
               <button className="admin-action-button primary">保存</button>
@@ -272,7 +279,7 @@ export function AdminProductManager({ products }: { products: Product[] }) {
           <p className="muted-note">请选择商品</p>
         )}
       </div>
-      {editing ? <form id="variant-add-form" action={addVariant} /> : null}
+      {editing ? <form id="variant-add-form" className="sr-only-form" action={addVariant} /> : null}
     </section>
   );
 }

@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { cookies } from "next/headers";
+import { getShippingCents, paymentEnv } from "./config";
 import { seedProducts } from "./products";
 import { type CartLine, formatMoney } from "./shared";
 
@@ -63,6 +64,54 @@ export type ProductVariant = {
   archived: boolean;
 };
 
+export type PaymentSettings = {
+  paypalEnabled: boolean;
+  paypalClientId: string;
+  paypalSecret: string;
+  paypalApiBaseUrl: string;
+  paypalWebhookId: string;
+  applePayEnabled: boolean;
+  applePayMerchantId: string;
+};
+
+export type OrderSummary = {
+  id: number;
+  orderNumber: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  address: string;
+  apartment: string;
+  city: string;
+  country: string;
+  province: string;
+  postalCode: string;
+  phone: string;
+  subtotalCents: number;
+  shippingCents: number;
+  taxCents: number;
+  totalCents: number;
+  status: string;
+  paymentProvider: string;
+  paymentStatus: string;
+  paymentReference: string;
+  paidAt: string | null;
+  shippingCarrier: string;
+  trackingNumber: string;
+  shippingNote: string;
+  fulfilledAt: string | null;
+  createdAt: string;
+  items: Array<{
+    id: number;
+    sku: string;
+    size: string;
+    quantity: number;
+    priceCents: number;
+    productName: string;
+    image: string;
+  }>;
+};
+
 type VariantRow = {
   id: number;
   product_id: number;
@@ -114,6 +163,10 @@ function migrate(conn: DatabaseSync) {
     "ALTER TABLE orders ADD COLUMN payment_reference TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE orders ADD COLUMN paid_at TEXT",
     "ALTER TABLE orders ADD COLUMN inventory_locked_until TEXT",
+    "ALTER TABLE orders ADD COLUMN shipping_carrier TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE orders ADD COLUMN tracking_number TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE orders ADD COLUMN shipping_note TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE orders ADD COLUMN fulfilled_at TEXT",
     "ALTER TABLE order_items ADD COLUMN variant_id INTEGER",
     "ALTER TABLE product_variants ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"
   ];
@@ -333,10 +386,121 @@ export function getCart(sessionId: string): CartLine[] {
 
 export function cartTotals(lines: CartLine[]) {
   const subtotalCents = lines.reduce((sum, line) => sum + line.priceCents * line.quantity, 0);
+  const shippingCents = lines.length > 0 ? getShippingCents() : 0;
   return {
     subtotalCents,
-    shippingCents: 0,
+    shippingCents,
     taxCents: 0,
-    totalCents: subtotalCents
+    totalCents: subtotalCents + shippingCents
   };
+}
+
+function getSettingValue(key: string) {
+  const row = db().prepare("SELECT value FROM site_settings WHERE key = ?").get(key) as { value: string } | undefined;
+  return row?.value ?? "";
+}
+
+function setSettingValue(key: string, value: string) {
+  db().prepare(`
+    INSERT INTO site_settings (key, value)
+    VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(key, value);
+}
+
+function parseEnabled(value: string, fallback = false) {
+  if (!value) return fallback;
+  return value === "true";
+}
+
+export function getPaymentSettings(): PaymentSettings {
+  return {
+    paypalEnabled: parseEnabled(getSettingValue("payment.paypal.enabled"), Boolean(paymentEnv.paypalClientId && paymentEnv.paypalSecret)),
+    paypalClientId: getSettingValue("payment.paypal.client_id") || paymentEnv.paypalClientId,
+    paypalSecret: getSettingValue("payment.paypal.secret") || paymentEnv.paypalSecret,
+    paypalApiBaseUrl: getSettingValue("payment.paypal.api_base_url") || paymentEnv.paypalApiBaseUrl,
+    paypalWebhookId: getSettingValue("payment.paypal.webhook_id"),
+    applePayEnabled: parseEnabled(getSettingValue("payment.apple_pay.enabled"), paymentEnv.applePayEnabled === "true"),
+    applePayMerchantId: getSettingValue("payment.apple_pay.merchant_id") || paymentEnv.applePayMerchantId,
+  };
+}
+
+export function savePaymentSettings(input: Partial<PaymentSettings>) {
+  if (typeof input.paypalEnabled === "boolean") {
+    setSettingValue("payment.paypal.enabled", input.paypalEnabled ? "true" : "false");
+  }
+  if (typeof input.paypalClientId === "string") {
+    setSettingValue("payment.paypal.client_id", input.paypalClientId.trim());
+  }
+  if (typeof input.paypalSecret === "string") {
+    setSettingValue("payment.paypal.secret", input.paypalSecret.trim());
+  }
+  if (typeof input.paypalApiBaseUrl === "string") {
+    setSettingValue("payment.paypal.api_base_url", input.paypalApiBaseUrl.trim());
+  }
+  if (typeof input.paypalWebhookId === "string") {
+    setSettingValue("payment.paypal.webhook_id", input.paypalWebhookId.trim());
+  }
+  if (typeof input.applePayEnabled === "boolean") {
+    setSettingValue("payment.apple_pay.enabled", input.applePayEnabled ? "true" : "false");
+  }
+  if (typeof input.applePayMerchantId === "string") {
+    setSettingValue("payment.apple_pay.merchant_id", input.applePayMerchantId.trim());
+  }
+}
+
+export function getOrderByNumber(orderNumber: string) {
+  const order = db().prepare(`
+    SELECT
+      id,
+      order_number AS orderNumber,
+      email,
+      first_name AS firstName,
+      last_name AS lastName,
+      address,
+      COALESCE(apartment, '') AS apartment,
+      city,
+      country,
+      province,
+      postal_code AS postalCode,
+      phone,
+      subtotal_cents AS subtotalCents,
+      shipping_cents AS shippingCents,
+      tax_cents AS taxCents,
+      total_cents AS totalCents,
+      status,
+      payment_provider AS paymentProvider,
+      payment_status AS paymentStatus,
+      payment_reference AS paymentReference,
+      paid_at AS paidAt,
+      shipping_carrier AS shippingCarrier,
+      tracking_number AS trackingNumber,
+      shipping_note AS shippingNote,
+      fulfilled_at AS fulfilledAt,
+      created_at AS createdAt
+    FROM orders
+    WHERE order_number = ?
+  `).get(orderNumber) as Omit<OrderSummary, "items"> | undefined;
+
+  if (!order) return null;
+
+  const items = db().prepare(`
+    SELECT
+      oi.id,
+      oi.sku,
+      oi.size,
+      oi.quantity,
+      oi.price_cents AS priceCents,
+      p.name AS productName,
+      p.image
+    FROM order_items oi
+    JOIN products p ON p.id = oi.product_id
+    WHERE oi.order_id = ?
+    ORDER BY oi.id ASC
+  `).all(order.id) as OrderSummary["items"];
+
+  return {
+    ...order,
+    items,
+  } satisfies OrderSummary;
 }

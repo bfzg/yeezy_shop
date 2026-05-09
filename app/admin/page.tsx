@@ -24,6 +24,7 @@ export default async function AdminPage() {
         <div className="admin-header-actions">
           <Link className="text-button" href="/admin/products/new">新增商品</Link>
           <Link className="text-button" href="/admin/orders">订单管理</Link>
+          <Link className="text-button" href="/admin/payments">支付设置</Link>
         </div>
       </section>
       <AdminProductManager products={products} />

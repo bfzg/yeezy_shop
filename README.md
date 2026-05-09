@@ -4,6 +4,20 @@
 
 Copy `.env.example` to `.env.local` and replace the example values with your real credentials.
 
+## Store config
+
+`SHIPPING_FLAT_RATE_USD`
+
+Used by the server to calculate the fixed shipping amount for checkout and order creation.
+
+What to provide: a USD amount in decimal format.
+
+Example:
+
+```env
+SHIPPING_FLAT_RATE_USD=24.99
+```
+
 ### PayPal
 
 `PAYPAL_CLIENT_ID`
@@ -30,28 +44,16 @@ Example:
 PAYPAL_SECRET=EGExampleSecretFromPayPalDeveloperDashboard
 ```
 
-`PAYPAL_MERCHANT_ID`
+`PAYPAL_API_BASE_URL`
 
-Used to identify the PayPal merchant account that will receive the payment.
+Used by the server when calling PayPal's Orders API.
 
-What to provide: your PayPal business account Merchant ID.
-
-Example:
-
-```env
-PAYPAL_MERCHANT_ID=9ABCDEFGH123
-```
-
-`PAYPAL_BASE_URL`
-
-Used as the base checkout URL when redirecting the customer into PayPal.
-
-What to provide: the PayPal checkout base URL for the environment you are using.
+What to provide: the correct REST API base URL for the environment you are using.
 
 Example:
 
 ```env
-PAYPAL_BASE_URL=https://www.paypal.com/checkoutnow
+PAYPAL_API_BASE_URL=https://api-m.sandbox.paypal.com
 ```
 
 ### Apple Pay
@@ -96,6 +98,6 @@ STRIPE_SECRET_KEY=sk_test_example_replace_me
 
 ## Notes
 
-- For local development, use PayPal Sandbox credentials first.
+- For local development, use PayPal Sandbox `client id`, `secret`, and `https://api-m.sandbox.paypal.com` first.
 - Do not commit real secrets to the repository.
 - If you are not using Apple Pay yet, leave the Apple Pay values as the defaults from `.env.example`.

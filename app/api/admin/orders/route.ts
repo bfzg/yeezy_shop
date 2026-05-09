@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { fulfillOrder, refundOrder, releaseOrderLock } from "@/lib/orders";
+import { fulfillOrder, refundOrder, releaseOrderLock, updateShippingInfo } from "@/lib/orders";
 
-const allowedActions = new Set(["fulfill", "cancel", "refund"]);
+const allowedActions = new Set(["fulfill", "cancel", "refund", "update_shipping"]);
 
 export async function PATCH(request: Request) {
   const admin = await requireAdmin();
@@ -21,7 +21,14 @@ export async function PATCH(request: Request) {
 
   try {
     if (action === "fulfill") {
-      fulfillOrder(orderId);
+      if (!body.carrier || !body.trackingNumber) {
+        return NextResponse.json({ error: "Carrier and tracking number are required." }, { status: 400 });
+      }
+      fulfillOrder(orderId, {
+        carrier: String(body.carrier),
+        trackingNumber: String(body.trackingNumber),
+        note: String(body.note ?? "")
+      });
     } else if (action === "cancel") {
       if (current.status !== "inventory_locked") {
         return NextResponse.json({ error: "Only unpaid locked orders can be cancelled. Use refund for paid orders." }, { status: 409 });
@@ -29,6 +36,15 @@ export async function PATCH(request: Request) {
       releaseOrderLock(orderId);
     } else if (action === "refund") {
       refundOrder(orderId);
+    } else if (action === "update_shipping") {
+      if (!body.carrier || !body.trackingNumber) {
+        return NextResponse.json({ error: "Carrier and tracking number are required." }, { status: 400 });
+      }
+      updateShippingInfo(orderId, {
+        carrier: String(body.carrier),
+        trackingNumber: String(body.trackingNumber),
+        note: String(body.note ?? "")
+      });
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

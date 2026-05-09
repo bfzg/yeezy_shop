@@ -15,12 +15,16 @@ type AdminOrder = {
   paid_at: string | null;
   total_cents: number;
   created_at: string;
+  shipping_carrier: string;
+  tracking_number: string;
+  shipping_note: string;
 };
 
 type AdminOrdersPageProps = {
   searchParams: Promise<{
     paidSort?: string;
     page?: string;
+    paymentStatus?: string;
   }>;
 };
 
@@ -32,6 +36,9 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
 
   const params = await searchParams;
   const paidSort = params.paidSort === "oldest" ? "oldest" : "latest";
+  const paymentStatus = ["all", "unpaid", "pending", "paid"].includes(params.paymentStatus ?? "")
+    ? String(params.paymentStatus)
+    : "paid";
   const page = Math.max(1, Number(params.page ?? 1) || 1);
   const offset = (page - 1) * PAGE_SIZE;
   const orderBy = paidSort === "oldest"
@@ -39,8 +46,13 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
     : "paid_at IS NULL ASC, paid_at DESC, id DESC";
   const sessionId = await getSessionId();
   const cart = getCart(sessionId);
-  const total = db().prepare("SELECT COUNT(*) AS count FROM orders").get() as { count: number };
-  const rows = db().prepare(`SELECT * FROM orders ORDER BY ${orderBy} LIMIT ? OFFSET ?`).all(PAGE_SIZE, offset) as AdminOrder[];
+  const whereClause = paymentStatus === "all" ? "" : "WHERE payment_status = ?";
+  const total = paymentStatus === "all"
+    ? db().prepare("SELECT COUNT(*) AS count FROM orders").get() as { count: number }
+    : db().prepare("SELECT COUNT(*) AS count FROM orders WHERE payment_status = ?").get(paymentStatus) as { count: number };
+  const rows = paymentStatus === "all"
+    ? db().prepare(`SELECT * FROM orders ORDER BY ${orderBy} LIMIT ? OFFSET ?`).all(PAGE_SIZE, offset) as AdminOrder[]
+    : db().prepare(`SELECT * FROM orders ${whereClause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`).all(paymentStatus, PAGE_SIZE, offset) as AdminOrder[];
   const orders = rows.map((order) => ({ ...order }));
 
   return (
@@ -58,6 +70,7 @@ export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageP
         page={page}
         pageSize={PAGE_SIZE}
         paidSort={paidSort}
+        paymentStatus={paymentStatus as "all" | "unpaid" | "pending" | "paid"}
         totalOrders={total.count}
       />
     </main>

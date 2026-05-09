@@ -21,7 +21,7 @@ export function LoginRegister() {
       return;
     }
     showToast(mode === "login" ? "登录成功" : "账户已创建", "success");
-    router.push("/account");
+    router.push("/");
     router.refresh();
   }
 

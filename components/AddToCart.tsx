@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ProductVariant } from "@/lib/db";
 
@@ -44,13 +43,12 @@ function writeCart(lines: LocalCartLine[]) {
 }
 
 export function AddToCart({ product, variants }: { product: AddProduct; variants: ProductVariant[] }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const activeVariants = variants.filter((variant) => variant.active && variant.archived === false);
   const [variantId, setVariantId] = useState(activeVariants[0]?.id ?? 0);
   const selected = activeVariants.find((variant) => variant.id === variantId);
 
-  function add() {
+  function add(event: React.MouseEvent<HTMLButtonElement>) {
     if (!selected) return;
     setLoading(true);
     const lines = readCart();
@@ -75,8 +73,14 @@ export function AddToCart({ product, variants }: { product: AddProduct; variants
       });
     }
     writeCart(lines);
+    const rect = event.currentTarget.getBoundingClientRect();
+    window.dispatchEvent(new CustomEvent("yezi-cart-animate", {
+      detail: {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      },
+    }));
     setLoading(false);
-    router.refresh();
   }
 
   return (
