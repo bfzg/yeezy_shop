@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AdminCategorySelect } from "@/components/AdminCategorySelect";
 import { AdminImageManager, type AdminImageManagerHandle } from "@/components/AdminImageManager";
+import { showToast } from "@/lib/toast";
 
 export function AdminTools() {
   const router = useRouter();
@@ -19,7 +20,10 @@ export function AdminTools() {
     if (response.ok) {
       formRef.current?.reset();
       imageManagerRef.current?.reset();
+      showToast("商品已创建", "success");
       router.refresh();
+    } else {
+      showToast("商品创建失败", "error");
     }
   }
 
@@ -30,8 +34,14 @@ export function AdminTools() {
           <input name="sku" placeholder="SKU" required />
           <input name="name" placeholder="商品名称" required />
           <AdminCategorySelect defaultValue="mens" exclude={["new"]} />
-          <input name="price" placeholder="价格" required />
-          <input name="stock" placeholder="库存" defaultValue="12" />
+          <label className="unit-field">
+            <input name="price" placeholder="价格" required />
+            <span>USD</span>
+          </label>
+          <label className="unit-field">
+            <input name="stock" placeholder="库存" defaultValue="12" />
+            <span>件</span>
+          </label>
           <input name="sizes" placeholder="尺码：1,2,3" defaultValue="1,2,3" />
           <AdminImageManager ref={imageManagerRef} initialImages={[]} />
           <textarea name="description" placeholder="描述" />

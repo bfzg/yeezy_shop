@@ -46,8 +46,9 @@ function writeCart(lines: LocalCartLine[]) {
 export function AddToCart({ product, variants }: { product: AddProduct; variants: ProductVariant[] }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [variantId, setVariantId] = useState(variants[0]?.id ?? 0);
-  const selected = variants.find((variant) => variant.id === variantId);
+  const activeVariants = variants.filter((variant) => variant.active && variant.archived === false);
+  const [variantId, setVariantId] = useState(activeVariants[0]?.id ?? 0);
+  const selected = activeVariants.find((variant) => variant.id === variantId);
 
   function add() {
     if (!selected) return;
@@ -81,7 +82,7 @@ export function AddToCart({ product, variants }: { product: AddProduct; variants
   return (
     <div className="variant-picker">
       <div className="size-row" aria-label="Size">
-        {variants.map((variant) => (
+        {activeVariants.map((variant) => (
           <button
             className={variant.id === variantId ? "active" : ""}
             disabled={variant.stock - variant.reserved <= 0}

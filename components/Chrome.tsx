@@ -4,16 +4,43 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Plus, ShoppingBag } from "lucide-react";
 
+const CART_KEY = "yezi_cart_v1";
+
+type CartLine = {
+  quantity: number;
+};
+
 export function StoreChrome({
   cartCount,
   backHref,
   showPlus = true,
-}: {
+  activeCategory = "new",
+  }: {
   cartCount: number;
   backHref?: string;
   showPlus?: boolean;
+  activeCategory?: string;
 }) {
   const [scrolled, setScrolled] = useState(false);
+  const [liveCartCount, setLiveCartCount] = useState(cartCount);
+
+  useEffect(() => {
+    function readCartCount() {
+      try {
+        const lines = JSON.parse(window.localStorage.getItem(CART_KEY) ?? "[]") as CartLine[];
+        setLiveCartCount(lines.reduce((sum, line) => sum + (line.quantity ?? 0), 0));
+      } catch {
+        setLiveCartCount(0);
+      }
+    }
+    readCartCount();
+    window.addEventListener("storage", readCartCount);
+    window.addEventListener("yezi-cart-updated", readCartCount);
+    return () => {
+      window.removeEventListener("storage", readCartCount);
+      window.removeEventListener("yezi-cart-updated", readCartCount);
+    };
+  }, [cartCount]);
 
   useEffect(() => {
     function update() {
@@ -30,6 +57,7 @@ export function StoreChrome({
   ].join(" ");
   const iconButtonClass = "inline-flex h-7 w-7 items-center justify-center";
   const rightLinkClass = "inline-flex h-7 items-center justify-center gap-1.5";
+  const navLinkClass = (value: string) => activeCategory === value ? "active" : "";
 
   return (
     <header className={topBarClass}>
@@ -47,24 +75,24 @@ export function StoreChrome({
       {!backHref ? (
         <nav className="top-nav" aria-label="Product categories">
           <div>
-            <Link className="active" href="/">
+            <Link className={navLinkClass("new")} href="/">
               NEW
             </Link>
-            <Link href="/?category=mens">MENS</Link>
-            <Link href="/?category=womens">WOMENS</Link>
+            <Link className={navLinkClass("mens")} href="/?category=mens">MENS</Link>
+            <Link className={navLinkClass("womens")} href="/?category=womens">WOMENS</Link>
           </div>
           <div>
-            <Link href="/?category=footwear">FOOTWEAR</Link>
-            <Link href="/?category=accessories">ACCESSORIES</Link>
+            <Link className={navLinkClass("footwear")} href="/?category=footwear">FOOTWEAR</Link>
+            <Link className={navLinkClass("accessories")} href="/?category=accessories">ACCESSORIES</Link>
           </div>
           <div>
-            <Link href="/?category=slides">SLIDES</Link>
+            <Link className={navLinkClass("slides")} href="/?category=slides">SLIDES</Link>
           </div>
         </nav>
       ) : null}
       <div className="flex flex-1 items-center justify-end">
         <Link className={rightLinkClass} href="/cart" aria-label="Cart">
-          <span>{cartCount}</span>
+          <span>{liveCartCount}</span>
           <ShoppingBag size={18} strokeWidth={2.4} />
         </Link>
       </div>

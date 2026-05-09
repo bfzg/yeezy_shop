@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 export type AdminImageManagerHandle = {
   reset: () => void;
@@ -20,7 +21,7 @@ function AdminImageManager({
   galleryFieldName = "gallery"
 }, ref) {
   const [images, setImages] = useState(() => uniqueImages(initialImages));
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragSrc, setDragSrc] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(ref, () => ({
@@ -48,12 +49,25 @@ function AdminImageManager({
   }
 
   function move(from: number, to: number) {
-    setImages((current) => {
-      const next = [...current];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return next;
-    });
+    const next = [...images];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    const startViewTransition = ("startViewTransition" in document)
+      ? (document as Document & { startViewTransition: (updateCallback: () => void) => void }).startViewTransition.bind(document)
+      : null;
+    if (startViewTransition) {
+      startViewTransition(() => flushSync(() => setImages(next)));
+    } else {
+      setImages(next);
+    }
+  }
+
+  function moveImage(draggedSrc: string, targetSrc: string) {
+    if (draggedSrc === targetSrc) return;
+    const from = images.findIndex((image) => image === draggedSrc);
+    const to = images.findIndex((image) => image === targetSrc);
+    if (from < 0 || to < 0) return;
+    move(from, to);
   }
 
   return (
@@ -63,18 +77,25 @@ function AdminImageManager({
       <div className="image-strip" aria-label="商品图片排序">
         {images.map((src, index) => (
           <div
-            className={`image-tile ${index === 0 ? "primary" : ""}`}
+            className={`image-tile ${index === 0 ? "primary" : ""} ${dragSrc === src ? "dragging" : ""}`}
             draggable
             key={`${src}-${index}`}
-            onDragStart={() => setDragIndex(index)}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={() => {
-              if (dragIndex !== null && dragIndex !== index) move(dragIndex, index);
-              setDragIndex(null);
+            onDragStart={() => setDragSrc(src)}
+            onDragEnd={() => setDragSrc(null)}
+            onDragOver={(event) => {
+              event.preventDefault();
+              if (dragSrc) moveImage(dragSrc, src);
             }}
+            onDrop={(event) => event.preventDefault()}
+            style={{ viewTransitionName: imageTransitionName(src) }}
           >
+            <span className="drag-handle image-drag-handle" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
             <Image src={src} alt={`商品图片 ${index + 1}`} width={120} height={120} />
-            <span>{index === 0 ? "首图" : `图 ${index + 1}`}</span>
+            <span className="image-index-label">{index === 0 ? "首图" : `图 ${index + 1}`}</span>
             <button onClick={() => remove(index)} type="button">移除</button>
           </div>
         ))}
@@ -90,4 +111,8 @@ function AdminImageManager({
 
 function uniqueImages(images: string[]) {
   return Array.from(new Set(images.map((image) => image.trim()).filter(Boolean)));
+}
+
+function imageTransitionName(src: string) {
+  return `admin-image-${src.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }

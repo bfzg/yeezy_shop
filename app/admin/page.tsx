@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AdminProductManager } from "@/components/AdminProductManager";
 import { StoreChrome } from "@/components/Chrome";
 import { requireAdmin } from "@/lib/auth";
-import { getCart, getProducts, getSessionId } from "@/lib/db";
+import { getAdminProducts, getCart, getSessionId } from "@/lib/db";
 
 export default async function AdminPage() {
   const admin = await requireAdmin();
@@ -11,14 +11,14 @@ export default async function AdminPage() {
 
   const sessionId = await getSessionId();
   const cart = getCart(sessionId);
-  const products = getProducts();
+  const products = getAdminProducts();
 
   return (
     <main className="shell admin-shell">
       <StoreChrome cartCount={cart.reduce((sum, line) => sum + line.quantity, 0)} backHref="/" />
       <section className="admin-header">
         <div>
-          <h1>ADMIN</h1>
+          <h1>库存管理</h1>
           <p>商品管理 / 库存</p>
         </div>
         <div className="admin-header-actions">

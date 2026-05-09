@@ -12,7 +12,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
 
   return (
     <main className="shell">
-      <StoreChrome cartCount={cartCount} />
+      <StoreChrome cartCount={cartCount} activeCategory={params.category ?? "new"} />
       <section className="product-grid" aria-label="Products">
         {products.map((product) => (
           <Link className="product-card" href={`/products/${product.slug}`} key={product.id}>

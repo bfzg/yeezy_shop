@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatMoney, type CartLine } from "@/lib/shared";
+import { showToast } from "@/lib/toast";
 
 const CART_KEY = "yezi_cart_v1";
 
@@ -27,10 +28,8 @@ function totalsFor(lines: CartLine[]) {
 
 export function CartClient() {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [lines, setLines] = useState<CartLine[]>([]);
-  const [success, setSuccess] = useState("");
-  const [error, setError] = useState("");
-  const [paymentProvider, setPaymentProvider] = useState("stripe");
   const currentTotals = useMemo(() => totalsFor(lines), [lines]);
 
   useEffect(() => {
@@ -54,11 +53,14 @@ export function CartClient() {
     writeCart(updated);
   }
 
-  async function submit(formData: FormData) {
-    setError("");
+  async function checkout(provider: "paypal" | "manual", formData?: FormData) {
+    const form = formRef.current;
+    if (!form) return;
+    if (!form.reportValidity()) return;
+    const source = formData ?? new FormData(form);
     const checkoutPayload = {
-      ...Object.fromEntries(formData.entries()),
-      paymentProvider,
+      ...Object.fromEntries(source.entries()),
+      paymentProvider: provider,
       cartItems: lines.map((line) => ({
         productId: line.productId,
         variantId: line.variantId,
@@ -75,33 +77,30 @@ export function CartClient() {
     if (response.ok) {
       writeCart([]);
       setLines([]);
-      setSuccess(`ORDER ${payload.orderNumber} ${payload.payment.status === "simulated_paid" ? "PAID" : "CREATED"}`);
+      showToast(provider === "paypal" ? `PayPal 订单 ${payload.orderNumber} 已创建` : `订单 ${payload.orderNumber} 已创建`, "success");
+      if (provider === "paypal" && payload.payment?.redirectUrl) {
+        window.location.href = payload.payment.redirectUrl;
+        return;
+      }
       router.refresh();
     } else {
-      setError(payload.error ?? "CHECKOUT FAILED");
+      showToast(payload.error ?? "下单失败", "error");
     }
+  }
+
+  async function submit(formData: FormData) {
+    await checkout("manual", formData);
   }
 
   return (
     <main className="checkout">
-      <form action={submit}>
+      <form ref={formRef} action={submit}>
         <div className="express-pay">
-          <button className="pay-button" type="button">Apple Pay</button>
-          <button className="pay-button" type="button">PayPal</button>
+          <button className="pay-button" disabled type="button">Apple Pay</button>
+          <button className="pay-button paypal" onClick={() => checkout("paypal")} type="button">PayPal</button>
         </div>
-        <div className="divider">OR CONTINUE BELOW</div>
-
-        <h2 className="section-title">CONTACT INFORMATION</h2>
-        <label className="field full">
-          <span>EMAIL ADDRESS</span>
-          <input name="email" type="email" required />
-        </label>
-        <label className="check-row">
-          <input type="checkbox" defaultChecked />
-          <span>SUBSCRIBE TO UPDATES AND NOTIFICATIONS</span>
-        </label>
-
-        <h2 className="section-title">SHIPPING ADDRESS</h2>
+        <hr className="my-6" />
+        <h2 className="section-title mt-6">SHIPPING ADDRESS</h2>
         <div className="form-grid">
           <label className="field">
             <span>FIRST NAME</span>
@@ -141,22 +140,14 @@ export function CartClient() {
           </label>
         </div>
         <p className="muted-note">ENTER YOUR SHIPPING ADDRESS TO SEE AVAILABLE SHIPPING OPTIONS.</p>
-        <h2 className="section-title">PAYMENT DETAILS</h2>
-        <div className="payment-options">
-          {["stripe", "paypal", "apple_pay"].map((provider) => (
-            <button
-              className={paymentProvider === provider ? "active" : ""}
-              key={provider}
-              onClick={() => setPaymentProvider(provider)}
-              type="button"
-            >
-              {provider.replace("_", " ").toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <button className="submit-order" disabled={lines.length === 0}>CREATE ORDER</button>
-        {success ? <p className="success">{success}</p> : null}
-        {error ? <p className="error">{error}</p> : null}
+        <label className="field full">
+          <span>EMAIL ADDRESS</span>
+          <input name="email" type="email" required />
+        </label>
+        <label className="check-row">
+          <input type="checkbox" defaultChecked />
+          <span>SUBSCRIBE TO UPDATES AND NOTIFICATIONS</span>
+        </label>
       </form>
 
       <aside className="cart-summary">

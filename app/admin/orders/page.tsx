@@ -12,17 +12,35 @@ type AdminOrder = {
   status: string;
   payment_status: string;
   payment_provider: string;
+  paid_at: string | null;
   total_cents: number;
   created_at: string;
 };
 
-export default async function AdminOrdersPage() {
+type AdminOrdersPageProps = {
+  searchParams: Promise<{
+    paidSort?: string;
+    page?: string;
+  }>;
+};
+
+const PAGE_SIZE = 12;
+
+export default async function AdminOrdersPage({ searchParams }: AdminOrdersPageProps) {
   const admin = await requireAdmin();
   if (!admin) redirect("/login");
 
+  const params = await searchParams;
+  const paidSort = params.paidSort === "oldest" ? "oldest" : "latest";
+  const page = Math.max(1, Number(params.page ?? 1) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+  const orderBy = paidSort === "oldest"
+    ? "paid_at IS NULL ASC, paid_at ASC, id ASC"
+    : "paid_at IS NULL ASC, paid_at DESC, id DESC";
   const sessionId = await getSessionId();
   const cart = getCart(sessionId);
-  const rows = db().prepare("SELECT * FROM orders ORDER BY id DESC LIMIT 100").all() as AdminOrder[];
+  const total = db().prepare("SELECT COUNT(*) AS count FROM orders").get() as { count: number };
+  const rows = db().prepare(`SELECT * FROM orders ORDER BY ${orderBy} LIMIT ? OFFSET ?`).all(PAGE_SIZE, offset) as AdminOrder[];
   const orders = rows.map((order) => ({ ...order }));
 
   return (
@@ -35,7 +53,13 @@ export default async function AdminOrdersPage() {
         </div>
         <Link className="text-button" href="/admin">商品列表</Link>
       </section>
-      <AdminOrderManager orders={orders} />
+      <AdminOrderManager
+        orders={orders}
+        page={page}
+        pageSize={PAGE_SIZE}
+        paidSort={paidSort}
+        totalOrders={total.count}
+      />
     </main>
   );
 }

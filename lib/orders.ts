@@ -147,7 +147,8 @@ export function markOrderPaid(orderId: number, provider: string, reference: stri
     }
     conn.prepare(`
       UPDATE orders
-      SET status = 'paid', payment_status = 'paid', payment_provider = ?, payment_reference = ?, inventory_locked_until = NULL
+      SET status = 'paid', payment_status = 'paid', payment_provider = ?, payment_reference = ?,
+          paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP), inventory_locked_until = NULL
       WHERE id = ?
     `).run(provider, reference, orderId);
     conn.exec("COMMIT");

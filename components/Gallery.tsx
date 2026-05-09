@@ -13,19 +13,19 @@ export function Gallery({ images, name }: { images: string[]; name: string }) {
   }
 
   return (
-    <div>
-      {images.length > 1 ? (
-        <>
-          <button className="nav-arrow left" onClick={() => move(-1)} aria-label="Previous image">
-            <ChevronLeft size={32} strokeWidth={3} />
-          </button>
-          <button className="nav-arrow right" onClick={() => move(1)} aria-label="Next image">
-            <ChevronRight size={32} strokeWidth={3} />
-          </button>
-        </>
-      ) : null}
+    <div className="gallery-stage">
       <div className="detail-image-wrap">
         <Image className="detail-image" src={current} alt={name} width={900} height={900} priority />
+        {images.length > 1 ? (
+          <>
+            <button className="nav-arrow left" onClick={() => move(-1)} type="button" aria-label="Previous image">
+              <ChevronLeft size={32} strokeWidth={3} />
+            </button>
+            <button className="nav-arrow right" onClick={() => move(1)} type="button" aria-label="Next image">
+              <ChevronRight size={32} strokeWidth={3} />
+            </button>
+          </>
+        ) : null}
       </div>
       <div className="dots" aria-label="Gallery position">
         {images.map((image, dotIndex) => (

@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { showToast } from "@/lib/toast";
 
 type AdminOrder = {
   id: number;
@@ -10,39 +11,54 @@ type AdminOrder = {
   status: string;
   payment_status: string;
   payment_provider: string;
+  paid_at: string | null;
   total_cents: number;
   created_at: string;
 };
 
-export function AdminOrderManager({ orders }: { orders: AdminOrder[] }) {
+type AdminOrderManagerProps = {
+  orders: AdminOrder[];
+  page: number;
+  pageSize: number;
+  paidSort: "latest" | "oldest";
+  totalOrders: number;
+};
+
+export function AdminOrderManager({ orders, page, pageSize, paidSort, totalOrders }: AdminOrderManagerProps) {
   const router = useRouter();
-  const [message, setMessage] = useState("");
+  const totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));
+  const nextSort = paidSort === "latest" ? "oldest" : "latest";
 
   async function update(orderId: number, action: string) {
-    setMessage("");
     const response = await fetch("/api/admin/orders", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId, action })
     });
     if (response.ok) {
-      setMessage("订单已更新");
+      showToast("订单已更新", "success");
     } else {
       const payload = await response.json();
-      setMessage(payload.error ?? "更新失败");
+      showToast(payload.error ?? "订单更新失败", "error");
     }
     router.refresh();
   }
 
   return (
     <section>
-      <h2 className="section-title spaced">订单管理</h2>
+      <div className="admin-table-toolbar">
+        <h2 className="section-title spaced">订单管理</h2>
+        <span>共 {totalOrders} 单 / 第 {page} 页</span>
+      </div>
       <div className="admin-table">
         <div className="admin-table-head">
           <span>订单号</span>
           <span>客户</span>
           <span>订单状态</span>
           <span>支付</span>
+          <Link className="sort-link" href={`/admin/orders?paidSort=${nextSort}&page=1`}>
+            支付成功时间 {paidSort === "latest" ? "↓" : "↑"}
+          </Link>
           <span>金额</span>
           <span>操作</span>
         </div>
@@ -52,6 +68,7 @@ export function AdminOrderManager({ orders }: { orders: AdminOrder[] }) {
             <span>{order.email}</span>
             <span>{statusText(order.status)}</span>
             <span>{paymentText(order.payment_provider)} / {paymentStatusText(order.payment_status)}</span>
+            <span>{formatDateTime(order.paid_at)}</span>
             <span className="">${(order.total_cents / 100).toFixed(2)}</span>
             <span className="table-actions">
               {order.status === "paid" ? (
@@ -68,7 +85,23 @@ export function AdminOrderManager({ orders }: { orders: AdminOrder[] }) {
           </div>
         ))}
       </div>
-      {message ? <p className="success">{message}</p> : null}
+      <div className="pagination">
+        <Link
+          aria-disabled={page <= 1}
+          className={page <= 1 ? "disabled" : ""}
+          href={`/admin/orders?paidSort=${paidSort}&page=${Math.max(1, page - 1)}`}
+        >
+          上一页
+        </Link>
+        <span>{page} / {totalPages}</span>
+        <Link
+          aria-disabled={page >= totalPages}
+          className={page >= totalPages ? "disabled" : ""}
+          href={`/admin/orders?paidSort=${paidSort}&page=${Math.min(totalPages, page + 1)}`}
+        >
+          下一页
+        </Link>
+      </div>
     </section>
   );
 }
@@ -103,4 +136,17 @@ function paymentText(provider: string) {
     manual: "手动"
   };
   return map[provider] ?? provider;
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return "未支付";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
 }

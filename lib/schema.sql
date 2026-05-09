@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS product_variants (
   stock INTEGER NOT NULL DEFAULT 0,
   reserved INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1,
+  archived INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(product_id, size, color),
   FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
@@ -106,6 +107,7 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_provider TEXT NOT NULL DEFAULT 'manual',
   payment_status TEXT NOT NULL DEFAULT 'unpaid',
   payment_reference TEXT NOT NULL DEFAULT '',
+  paid_at TEXT,
   inventory_locked_until TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL

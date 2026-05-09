@@ -57,6 +57,57 @@ export async function PATCH(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   const body = await request.json();
+  if (body.action === "reorder" && Array.isArray(body.productIds)) {
+    const updateOrder = db().prepare("UPDATE products SET sort_order = ? WHERE id = ?");
+    for (const [index, productId] of body.productIds.entries()) {
+      updateOrder.run(index + 1, Number(productId));
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "addVariant") {
+    const productId = Number(body.productId);
+    const product = db().prepare("SELECT sku, price_cents FROM products WHERE id = ?").get(productId) as { sku: string; price_cents: number } | undefined;
+    if (!product) return NextResponse.json({ error: "Product not found." }, { status: 404 });
+    const size = String(body.size ?? "").trim();
+    if (!size) return NextResponse.json({ error: "Size is required." }, { status: 400 });
+    const color = String(body.color ?? "BLACK").trim() || "BLACK";
+    const variantSku = `${product.sku}-${size}`;
+    const existing = db().prepare("SELECT id, archived FROM product_variants WHERE product_id = ? AND size = ? AND color = ?")
+      .get(productId, size, color) as { id: number; archived: number } | undefined;
+    if (existing) {
+      if (existing.archived === 1) {
+        db().prepare("UPDATE product_variants SET archived = 0, active = 1, price_cents = ?, stock = ? WHERE id = ?")
+          .run(Math.round(Number(body.price ?? product.price_cents / 100) * 100), Number(body.stock ?? 0), existing.id);
+        return NextResponse.json({ ok: true, restored: true });
+      }
+      return NextResponse.json({ error: "Variant already exists." }, { status: 409 });
+    }
+    db().prepare(`
+      INSERT INTO product_variants (product_id, sku, size, color, price_cents, stock)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      productId,
+      variantSku,
+      size,
+      color,
+      Math.round(Number(body.price ?? product.price_cents / 100) * 100),
+      Number(body.stock ?? 0)
+    );
+    return NextResponse.json({ ok: true }, { status: 201 });
+  }
+
+  if (body.action === "deleteVariant") {
+    const variantId = Number(body.variantId);
+    const hasOrders = db().prepare("SELECT id FROM order_items WHERE variant_id = ? LIMIT 1").get(variantId);
+    if (hasOrders) {
+      db().prepare("UPDATE product_variants SET archived = 1, active = 0 WHERE id = ?").run(variantId);
+      return NextResponse.json({ ok: true, archived: true });
+    }
+    db().prepare("DELETE FROM product_variants WHERE id = ?").run(variantId);
+    return NextResponse.json({ ok: true, deleted: true });
+  }
+
   db().prepare(`
     UPDATE products SET
       name = ?, category = ?, price_cents = ?, description = ?, material = ?,

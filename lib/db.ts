@@ -60,6 +60,7 @@ export type ProductVariant = {
   stock: number;
   reserved: number;
   active: boolean;
+  archived: boolean;
 };
 
 type VariantRow = {
@@ -72,6 +73,7 @@ type VariantRow = {
   stock: number;
   reserved: number;
   active: number;
+  archived?: number;
 };
 
 export function db() {
@@ -83,6 +85,7 @@ export function db() {
     ensureVariants(database);
     ensureAdmin(database);
     archiveLegacyDeletedProducts(database);
+    backfillPaidAt(database);
   }
   return database;
 }
@@ -109,8 +112,10 @@ function migrate(conn: DatabaseSync) {
     "ALTER TABLE orders ADD COLUMN payment_provider TEXT NOT NULL DEFAULT 'manual'",
     "ALTER TABLE orders ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'unpaid'",
     "ALTER TABLE orders ADD COLUMN payment_reference TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE orders ADD COLUMN paid_at TEXT",
     "ALTER TABLE orders ADD COLUMN inventory_locked_until TEXT",
-    "ALTER TABLE order_items ADD COLUMN variant_id INTEGER"
+    "ALTER TABLE order_items ADD COLUMN variant_id INTEGER",
+    "ALTER TABLE product_variants ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"
   ];
   for (const statement of columns) {
     ignoreDuplicateColumn(() => conn.exec(statement));
@@ -201,6 +206,18 @@ function archiveLegacyDeletedProducts(conn: DatabaseSync) {
   `).run();
 }
 
+function backfillPaidAt(conn: DatabaseSync) {
+  conn.prepare(`
+    UPDATE orders
+    SET paid_at = COALESCE(
+      (SELECT MIN(payments.created_at) FROM payments WHERE payments.order_id = orders.id),
+      created_at
+    )
+    WHERE paid_at IS NULL
+      AND payment_status = 'paid'
+  `).run();
+}
+
 export function mapProduct(row: ProductRow): Product {
   const variants = getVariantsByProductId(row.id);
   return {
@@ -233,12 +250,15 @@ export function mapVariant(row: VariantRow): ProductVariant {
     priceCents: row.price_cents,
     stock: row.stock,
     reserved: row.reserved,
-    active: row.active === 1
+    active: row.active === 1,
+    archived: row.archived === 1
   };
 }
 
-export function getVariantsByProductId(productId: number) {
-  const rows = db().prepare("SELECT * FROM product_variants WHERE product_id = ? AND active = 1 ORDER BY size ASC").all(productId) as VariantRow[];
+export function getVariantsByProductId(productId: number, options: { includeInactive?: boolean } = {}) {
+  const rows = options.includeInactive
+    ? db().prepare("SELECT * FROM product_variants WHERE product_id = ? AND archived = 0 ORDER BY size ASC").all(productId) as VariantRow[]
+    : db().prepare("SELECT * FROM product_variants WHERE product_id = ? AND active = 1 AND archived = 0 ORDER BY size ASC").all(productId) as VariantRow[];
   return rows.map(mapVariant);
 }
 
@@ -248,6 +268,17 @@ export function getProducts(category?: string) {
     ? conn.prepare("SELECT * FROM products WHERE archived = 0 AND category = ? ORDER BY sort_order ASC").all(category)
     : conn.prepare("SELECT * FROM products WHERE archived = 0 ORDER BY sort_order ASC").all();
   return (rows as ProductRow[]).map(mapProduct);
+}
+
+export function getAdminProducts(category?: string) {
+  const conn = db();
+  const rows = category && category !== "all"
+    ? conn.prepare("SELECT * FROM products WHERE archived = 0 AND category = ? ORDER BY sort_order ASC").all(category)
+    : conn.prepare("SELECT * FROM products WHERE archived = 0 ORDER BY sort_order ASC").all();
+  return (rows as ProductRow[]).map((row) => ({
+    ...mapProduct(row),
+    variants: getVariantsByProductId(row.id, { includeInactive: true })
+  }));
 }
 
 export function getProductBySlug(slug: string) {

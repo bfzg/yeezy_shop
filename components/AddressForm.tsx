@@ -1,14 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { showToast } from "@/lib/toast";
 
 export function AddressForm() {
   const router = useRouter();
-  const [error, setError] = useState("");
 
   async function submit(formData: FormData) {
-    setError("");
     const payload = Object.fromEntries(formData.entries());
     const response = await fetch("/api/account/addresses", {
       method: "POST",
@@ -17,9 +15,10 @@ export function AddressForm() {
     });
     if (!response.ok) {
       const result = await response.json();
-      setError(result.error ?? "SAVE FAILED");
+      showToast(result.error ?? "地址保存失败", "error");
       return;
     }
+    showToast("地址已保存", "success");
     router.refresh();
   }
 
@@ -37,7 +36,6 @@ export function AddressForm() {
       <input name="phone" placeholder="PHONE" required />
       <label className="check-row"><input name="isDefault" type="checkbox" /> DEFAULT</label>
       <button className="submit-order">SAVE ADDRESS</button>
-      {error ? <p className="error">{error}</p> : null}
     </form>
   );
 }

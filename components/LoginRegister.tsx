@@ -2,14 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { showToast } from "@/lib/toast";
 
 export function LoginRegister() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [error, setError] = useState("");
 
   async function submit(formData: FormData) {
-    setError("");
     const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
     const response = await fetch(endpoint, {
       method: "POST",
@@ -18,9 +17,10 @@ export function LoginRegister() {
     });
     if (!response.ok) {
       const payload = await response.json();
-      setError(payload.error ?? "REQUEST FAILED");
+      showToast(payload.error ?? "请求失败", "error");
       return;
     }
+    showToast(mode === "login" ? "登录成功" : "账户已创建", "success");
     router.push("/account");
     router.refresh();
   }
@@ -37,7 +37,6 @@ export function LoginRegister() {
         <input name="password" type="password" placeholder="PASSWORD" required />
         <button className="submit-order">{mode === "login" ? "LOGIN" : "CREATE ACCOUNT"}</button>
         <p className="muted-note">ADMIN: admin@yezi.local / admin123</p>
-        {error ? <p className="error">{error}</p> : null}
       </form>
     </section>
   );

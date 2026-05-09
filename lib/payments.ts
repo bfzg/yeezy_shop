@@ -1,13 +1,6 @@
 import { db } from "./db";
+import { getPaymentMode } from "./payment-config";
 import { markOrderPaid } from "./orders";
-
-export function getPaymentMode() {
-  return {
-    stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY),
-    paypalConfigured: Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_SECRET),
-    applePayConfigured: Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_APPLE_PAY_ENABLED === "true")
-  };
-}
 
 export function createPayment(orderId: number, provider: "stripe" | "paypal" | "apple_pay" | "manual", amountCents: number) {
   const reference = `DEV-${provider.toUpperCase()}-${orderId}-${Date.now()}`;
